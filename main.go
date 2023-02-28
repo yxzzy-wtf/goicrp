@@ -62,17 +62,24 @@ import (
 	GCEN?XX?
 	QHB
 
-	GCE? ???B --> "group command? "
+	GCE? ???X ??P? --> "group command? "
 
-	Command lengths: 
+	P = player byte
+	X seems related to player, maybe the position?
+
+	Command lengths:
 
 	GCEE: 40, 52
 	GCEN: 28
 	GCEP: 52
 
+	GCPE: ??
+
 	???
 
-	GCEE -- unit command? 
+	GCEE -- unit command?
+
+	Command block @
 
 
 */
@@ -82,6 +89,7 @@ func main() {
 
 	var filename = flag.String("file", "", "The SGM file to process.")
 	var printcmds = flag.Bool("print-cmd", false, "Whether to print out each parsed command")
+	var printgc = flag.String("print-gc", "", "The tick-commands to print")
 	var stallcmds = flag.Bool("stall-cmd", false, "Whether to stall after printing each parsed command")
 	var summary = flag.Bool("summary", true, "Printout summary at the end")
 	var ignorenonactions = flag.Bool("ignore-empty-ticks", true, "Do not print out RSYN cycles from empty ticks")
@@ -102,6 +110,8 @@ func main() {
 	counts["SYNC"] = 0
 	counts["RTOK"] = 0
 	counts["GCE"] = 0
+
+	var players = make(map[byte]map[string]int)
 
 	var firstmove = 0
 
@@ -146,11 +156,30 @@ func main() {
 
 				for c := 0; c < int(commands); c++ {
 					cmd := syncbody[cmdsize*0 : cmdsize*1]
-					if !test(cmd, 0, []byte{0x47, 0x43, 0x45}) { // command starts GCE
+					lead := cmd[0:4]
+					buff := cmd[4:8]
+					rest := cmd[8:]
+
+					if _, exists := players[rest[2]]; !exists {
+						players[rest[2]] = make(map[string]int)
+					}
+
+					if _, exists := players[rest[2]][string(lead)]; !exists {
+						players[rest[2]][string(lead)] = 0
+					}
+
+					players[rest[2]][string(lead)] += 1
+
+					if !test(cmd, 0, []byte{0x47, 0x43}) { // command starts GC
+						fmt.Printf("%q\n", syncsl)
 						panic("SYNC command did not follow expected byte pattern with [0:2]=0x47 0x43 0x45")
 					}
-					if !test(cmd, 7, []byte{0x42}) {
-						panic("SYNC command did not follow expected byte pattern with [7]==0xe8")
+
+					if *printgc != "" {
+
+						if *printgc == "all" || *printgc == string(lead) {
+							fmt.Printf("T%08d: %s : %q : %v\n", counts["RSYN"], string(lead), buff, rest)
+						}
 					}
 				}
 			}
@@ -185,8 +214,16 @@ func main() {
 		time := fmt.Sprintf("%d:%02d", seconds/60, seconds%60)
 
 		fmt.Printf("Game duration: %d ticks / %s time (Fast)\n", counts["RSYN"], time)
-		fmt.Printf("Total GCE issued : %d\n", counts["GCE"])
+		fmt.Printf("Total GC issued : %d\n", counts["GCE"])
 		fmt.Printf("First action : %d ticks\n", firstmove)
+
+		fmt.Printf("Player summary:\n")
+		for k := range players {
+			fmt.Printf("Player ID %b:\n", k)
+			for j := range players[k] {
+				fmt.Printf("%s: %d\n", j, players[k][j])
+			}
+		}
 	}
 
 }
