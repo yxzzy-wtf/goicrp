@@ -94,9 +94,6 @@ func main() {
 				fmt.Printf("RSYN (T%d): len(%d) %v\n", counts["RSYN"], len(rsynsl), rsynsl)
 				fmt.Printf("SYNC (T%d): len(%d) %v\n", counts["RSYN"], len(syncsl), syncsl)
 				fmt.Printf("RTOK (T%d): len(%d) %v\n", counts["RSYN"], len(rtoksl), rtoksl)
-				if *stallcmds {
-					fmt.Scanln()
-				}
 				panic("RSYN/SYNC/RTOK did not follow expected byte pattern")
 			}
 
