@@ -85,14 +85,14 @@ import (
 */
 
 func main() {
-	fmt.Printf("IC Replay Parser\n")
-
 	var filename = flag.String("file", "", "The SGM file to process.")
 	var printcmds = flag.Bool("print-cmd", false, "Whether to print out each parsed command")
 	var printgc = flag.String("print-gc", "", "The tick-commands to print")
 	var stallcmds = flag.Bool("stall-cmd", false, "Whether to stall after printing each parsed command")
 	var summary = flag.Bool("summary", true, "Printout summary at the end")
 	var ignorenonactions = flag.Bool("ignore-empty-ticks", true, "Do not print out RSYN cycles from empty ticks")
+
+	var debug = flag.Bool("debug", false, "")
 
 	flag.Parse()
 
@@ -114,6 +114,73 @@ func main() {
 	var players = make(map[byte]map[string]int)
 
 	var firstmove = 0
+
+	// first 4 bytes are RCRD
+	// next byte is the header size?
+	cursor := 0
+
+	if *debug {
+		fmt.Printf("First 4 bytes: expected(RCRD) : %s\n", string(bytes[0:4]))
+	}
+
+	titlebytes := int(bytes[4])
+
+	if *debug {
+		fmt.Printf("Expected bytes in title: %d\n", titlebytes)
+	}
+
+	cursor += 5
+	titlesl := bytes[cursor : cursor+titlebytes]
+	cursor += 255
+	fmt.Printf("Parsing IC replay: `%s`\n", string(titlesl))
+
+	cursor += 32
+
+	if *debug {
+		fmt.Printf("Bytes %d, %d: expected(IC) : %s\n", cursor, cursor+1, bytes[cursor:cursor+2])
+	}
+
+	cursor += 2
+
+	if *debug {
+		fmt.Printf("Map name size bytes: %v\n", bytes[cursor:cursor+4])
+	}
+	mapnamebytes := int(bytes[cursor])
+	cursor += 4
+	mapnamesl := bytes[cursor : cursor+(mapnamebytes*2)]
+	fmt.Printf("Map name: %s\n", string(mapnamesl))
+
+	cursor += mapnamebytes * 2 //for some reason its x2
+
+	if *debug {
+		fmt.Printf("Map path size bytes: %v\n", bytes[cursor:cursor+4])
+	}
+	mappathbytes := int(bytes[cursor])
+	cursor += 4
+	mappathsl := bytes[cursor : cursor+mappathbytes+1]
+	fmt.Printf("Map path: %s\n", string(mappathsl))
+	cursor += mappathbytes + 1
+
+	if *debug {
+		fmt.Printf("Scenario data path bytes: %v\n", bytes[cursor:cursor+4])
+	}
+	scenpathbytes := int(bytes[cursor])
+	cursor += 4
+	scenpathsl := bytes[cursor : cursor+scenpathbytes]
+	fmt.Printf("Scenario path: %s\n", string(scenpathsl))
+	cursor += scenpathbytes + 1
+
+	if *debug {
+		fmt.Printf("XXX bytes: %v\n", bytes[cursor:cursor+4])
+	}
+	b := int(bytes[cursor])
+	cursor += 4
+	bsl := bytes[cursor : cursor+b]
+	fmt.Printf("B: %s\n", string(bsl))
+
+	fmt.Printf("%v\n", bytes[cursor:cursor+256])
+	fmt.Printf("%s\n", string(bytes[cursor:cursor+256]))
+	fmt.Printf("%q\n", bytes[cursor:cursor+256])
 
 	//var last = 0
 	//var lastcmd = "none"
