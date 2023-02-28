@@ -43,6 +43,28 @@ import (
 
 	RSYN[X 0 0] = there is something to process
 	SYNC[T 0 0 0 X ?]
+
+
+	----
+
+	When parsing SYNC blocks, commonly seeing:
+
+	Header:
+
+	[0:3]: SYNC
+	[4]  : TICK
+	[5:7]: ???
+	[8]  : SIZE TOTAL
+	[9]  : ??
+	[10] : GC commands? (game command?)
+
+	GCEE?XX?
+	GCEN?XX?
+	QHB
+
+	GCE? ???B --> "group command? "
+
+
 */
 
 func main() {
@@ -69,6 +91,7 @@ func main() {
 	counts["RSYN"] = 0
 	counts["SYNC"] = 0
 	counts["RTOK"] = 0
+	counts["GCE"] = 0
 
 	var firstmove = 0
 
@@ -92,7 +115,7 @@ func main() {
 				!test(syncsl, 0, []byte{0x53, 0x59, 0x4e, 0x43}) ||
 				!test(rtoksl, 0, []byte{0x52, 0x54, 0x4f, 0x4b}) {
 				fmt.Printf("RSYN (T%d): len(%d) %v\n", counts["RSYN"], len(rsynsl), rsynsl)
-				fmt.Printf("SYNC (T%d): len(%d) %v\n", counts["RSYN"], len(syncsl), syncsl)
+				fmt.Printf("SYNC (T%06d): len(%d) %v\n", counts["RSYN"], len(syncsl), syncsl)
 				fmt.Printf("RTOK (T%d): len(%d) %v\n", counts["RSYN"], len(rtoksl), rtoksl)
 				panic("RSYN/SYNC/RTOK did not follow expected byte pattern")
 			}
@@ -102,11 +125,40 @@ func main() {
 				firstmove = counts["RSYN"]
 			}
 
+			synchead := syncsl[0:12]
+			syncbody := syncsl[12:]
+
+			commands := int(syncsl[10])
+			counts["GCE"] += commands
+			cmdsize := 0
+			if commands != 0 {
+				cmdsize = len(syncbody) / commands
+
+				for c := 0; c < int(commands); c++ {
+					cmd := syncbody[cmdsize*0 : cmdsize*1]
+					if !test(cmd, 0, []byte{0x47, 0x43, 0x45}) { // command starts GCE
+						panic("SYNC command did not follow expected byte pattern with [0:2]=0x47 0x43 0x45")
+					}
+					if !test(cmd, 7, []byte{0x42}) {
+						panic("SYNC command did not follow expected byte pattern with [7]==0xe8")
+					}
+				}
+			}
+
 			if *printcmds && (!*ignorenonactions || !emptytick) {
 				if *printcmds {
-					fmt.Printf("RSYN (T%d): len(%d) %v\n", counts["RSYN"], len(rsynsl), rsynsl)
-					fmt.Printf("SYNC (T%d): len(%d) %v\n", counts["RSYN"], len(syncsl), syncsl)
-					fmt.Printf("RTOK (T%d): len(%d) %v\n", counts["RSYN"], len(rtoksl), rtoksl)
+					fmt.Printf("RSYN (T%06d): len(%d) %v\n", counts["RSYN"], len(rsynsl), rsynsl)
+					fmt.Printf("SYNC (T%06d): len(%d) %v\n", counts["SYNC"], len(syncsl), syncsl)
+
+					fmt.Printf("SYNC header   : %v (total sync len: %d; cmd in sync body: %d, cmd len: %d)\n", synchead, bytestosync, commands, cmdsize)
+
+					for c := 0; c < int(commands); c++ {
+						cmd := syncbody[cmdsize*0 : cmdsize*1]
+						fmt.Printf("CMD%02d    %s : %v\n", c+1, string(cmd[0:4]), cmd[4:])
+						fmt.Printf("`%v`\n", string(cmd[4:]))
+					}
+
+					fmt.Printf("RTOK (T%06d): len(%d) %v\n", counts["RTOK"], len(rtoksl), rtoksl)
 					if *stallcmds {
 						fmt.Scanln()
 					}
@@ -123,6 +175,7 @@ func main() {
 		time := fmt.Sprintf("%d:%02d", seconds/60, seconds%60)
 
 		fmt.Printf("Game duration: %d ticks / %s time (Fast)\n", counts["RSYN"], time)
+		fmt.Printf("Total GCE issued : %d\n", counts["GCE"])
 		fmt.Printf("First action : %d ticks\n", firstmove)
 	}
 
