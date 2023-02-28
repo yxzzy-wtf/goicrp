@@ -122,7 +122,7 @@ func main() {
 	}
 
 	if *summary {
-		seconds := counts["RSYN"] / 8
+		seconds := counts["RSYN"] / 12
 		time := fmt.Sprintf("%d:%02d", seconds/60, seconds%60)
 
 		fmt.Printf("Game duration: %d ticks / %s time (Fast)\n", counts["RSYN"], time)
