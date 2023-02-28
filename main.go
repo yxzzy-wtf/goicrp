@@ -66,48 +66,59 @@ func main() {
 	}
 
 	var counts = make(map[string]int)
+	counts["RSYN"] = 0
+	counts["SYNC"] = 0
+	counts["RTOK"] = 0
 
 	var firstmove = 0
 
-	var last = 0
-	var lastcmd = "none"
+	//var last = 0
+	//var lastcmd = "none"
 	var emptytick = false
 	for i := 0; i < len(bytes)-4; i++ {
-		var thiscmd = ""
-		if test(bytes, i, []byte{0x52, 0x53, 0x59, 0x4e}) { //RSYN
-			thiscmd = "RSYN"
-		} else if test(bytes, i, []byte{0x53, 0x59, 0x4e, 0x43}) { //SYNC
-			thiscmd = "SYNC"
-		} else if test(bytes, i, []byte{0x52, 0x54, 0x4f, 0x4b}) { //RTOK
-			thiscmd = "RTOK"
-		}
 
-		if thiscmd != "" {
-			if _, exists := counts[thiscmd]; !exists {
-				counts[thiscmd] = 0
-			}
-			counts[thiscmd] += 1
+		if test(bytes, i, []byte{0x52, 0x53, 0x59, 0x4e}) { //Found an RSYN cycle block
+			counts["RSYN"] += 1
+			counts["SYNC"] += 1
+			counts["RTOK"] += 1
 
-			slice := bytes[last : i-1]
+			bytestosync := int(bytes[i+4])
 
-			if lastcmd == "RSYN" {
-				emptytick = slice[0] == 0xc
-				if emptytick && firstmove == 0 {
-					firstmove = counts["RSYN"]
-				}
-			}
+			rsynsl := bytes[i : i+8]
+			syncsl := bytes[i+8 : i+8+bytestosync]
+			rtoksl := bytes[i+8+bytestosync : i+8+bytestosync+18]
 
-			if *printcmds && (!*ignorenonactions || !emptytick) {
-				fmt.Printf("\n%s (T%d):\nlen(%d) %v\n", lastcmd, counts["RSYN"], len(slice), slice)
-				fmt.Printf("\n%s\n", string(slice))
+			if !test(rsynsl, 0, []byte{0x52, 0x53, 0x59, 0x4e}) ||
+				!test(syncsl, 0, []byte{0x53, 0x59, 0x4e, 0x43}) ||
+				!test(rtoksl, 0, []byte{0x52, 0x54, 0x4f, 0x4b}) {
+				fmt.Printf("RSYN (T%d): len(%d) %v\n", counts["RSYN"], len(rsynsl), rsynsl)
+				fmt.Printf("SYNC (T%d): len(%d) %v\n", counts["RSYN"], len(syncsl), syncsl)
+				fmt.Printf("RTOK (T%d): len(%d) %v\n", counts["RSYN"], len(rtoksl), rtoksl)
 				if *stallcmds {
 					fmt.Scanln()
 				}
+				panic("RSYN/SYNC/RTOK did not follow expected byte pattern")
 			}
 
-			last = i + len(thiscmd)
-			lastcmd = thiscmd
+			emptytick = rsynsl[4] == 0xc
+			if firstmove == 0 && !emptytick {
+				firstmove = counts["RSYN"]
+			}
+
+			if *printcmds && (!*ignorenonactions || !emptytick) {
+				if *printcmds {
+					fmt.Printf("RSYN (T%d): len(%d) %v\n", counts["RSYN"], len(rsynsl), rsynsl)
+					fmt.Printf("SYNC (T%d): len(%d) %v\n", counts["RSYN"], len(syncsl), syncsl)
+					fmt.Printf("RTOK (T%d): len(%d) %v\n", counts["RSYN"], len(rtoksl), rtoksl)
+					if *stallcmds {
+						fmt.Scanln()
+					}
+				}
+			}
+
+			i += 8 + bytestosync + 18
 		}
+
 	}
 
 	if *summary {
