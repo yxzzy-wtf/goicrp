@@ -64,6 +64,16 @@ import (
 
 	GCE? ???B --> "group command? "
 
+	Command lengths: 
+
+	GCEE: 40, 52
+	GCEN: 28
+	GCEP: 52
+
+	???
+
+	GCEE -- unit command? 
+
 
 */
 
